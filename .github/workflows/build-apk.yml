@@ -1,0 +1,73 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Prepare project
+        run: |
+          test -f index.html || { echo "ERROR: index.html repo ke root par nahi hai"; ls -la; exit 1; }
+          mkdir -p www/lib
+          cp index.html www/index.html
+          cat > package.json <<'EOT'
+          {
+            "name": "mr-asrar-pdf-editor",
+            "version": "1.0.0",
+            "private": true,
+            "dependencies": {
+              "@capacitor/android": "^7.0.0",
+              "@capacitor/core": "^7.0.0"
+            },
+            "devDependencies": {
+              "@capacitor/cli": "^7.0.0"
+            }
+          }
+          EOT
+          cat > capacitor.config.json <<'EOT'
+          {
+            "appId": "com.mrasrar.pdfeditor",
+            "appName": "Mr Asrar PDF Editor",
+            "webDir": "www"
+          }
+          EOT
+
+      - name: Bundle libraries (offline use)
+        run: |
+          B=https://cdnjs.cloudflare.com/ajax/libs
+          curl -fL $B/pdf.js/3.11.174/pdf.min.js -o www/lib/pdf.min.js
+          curl -fL $B/pdf.js/3.11.174/pdf.worker.min.js -o www/lib/pdf.worker.min.js
+          curl -fL $B/pdf-lib/1.17.1/pdf-lib.min.js -o www/lib/pdf-lib.min.js
+          curl -fL $B/qrcode-generator/1.4.4/qrcode.min.js -o www/lib/qrcode.min.js
+          sed -i "s#$B/pdf.js/3.11.174/#lib/#g; s#$B/pdf-lib/1.17.1/#lib/#g; s#$B/qrcode-generator/1.4.4/#lib/#g" www/index.html
+
+      - run: npm install
+      - run: npx cap add android
+      - run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MrAsrar-PDF-Editor-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
