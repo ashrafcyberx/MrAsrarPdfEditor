@@ -32,7 +32,9 @@ jobs:
             "private": true,
             "dependencies": {
               "@capacitor/android": "^7.0.0",
-              "@capacitor/core": "^7.0.0"
+              "@capacitor/core": "^7.0.0",
+              "@capacitor/filesystem": "^7.0.0",
+              "@capacitor/share": "^7.0.0"
             },
             "devDependencies": {
               "@capacitor/cli": "^7.0.0"
@@ -58,6 +60,11 @@ jobs:
 
       - run: npm install
       - run: npx cap add android
+
+      - name: Storage permission (old Android) for saving PDFs
+        run: |
+          sed -i 's#<application#<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n    <application#' android/app/src/main/AndroidManifest.xml
+          grep -n "WRITE_EXTERNAL_STORAGE" android/app/src/main/AndroidManifest.xml
 
       - name: Apply logo and screen fit
         run: |
