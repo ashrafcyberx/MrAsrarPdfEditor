@@ -62,42 +62,44 @@ jobs:
       - name: Apply logo and screen fit
         run: |
           pip install --break-system-packages pillow || python3 -m pip install pillow || true
-          LOGO=$(ls logo.png logo.jpg logo.jpeg 2>/dev/null | head -1)
-          test -n "$LOGO" || { echo "ERROR: logo.png repo ke root par nahi hai"; ls -la; exit 1; }
+          LOGO=$(ls | grep -iE '\.(png|jpe?g|webp)$' | head -1)
+          echo "Logo file: '${LOGO}'"
+          [ -n "$LOGO" ] || echo "WARNING: root par koi image (logo) nahi mili, default icon rahega"
           LOGO="$LOGO" python3 - <<'PY'
           import os, glob
           from PIL import Image, ImageDraw
           BG = (1, 22, 77, 255)
-          src = Image.open(os.environ["LOGO"]).convert("RGBA")
-          w, h = src.size
-          s = min(w, h)
-          src = src.crop(((w - s) // 2, (h - s) // 2, (w - s) // 2 + s, (h - s) // 2 + s))
-          if src.getpixel((2, 2))[3] == 255:
-              m = Image.new("L", (s * 2, s * 2), 0)
-              ImageDraw.Draw(m).ellipse((10, 10, s * 2 - 10, s * 2 - 10), fill=255)
-              src.putalpha(m.resize((s, s), Image.LANCZOS))
           res = "android/app/src/main/res"
-          legacy = {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}
-          for d, px in legacy.items():
-              folder = f"{res}/mipmap-{d}"
-              os.makedirs(folder, exist_ok=True)
-              icon = src.resize((px, px), Image.LANCZOS)
-              icon.save(f"{folder}/ic_launcher.png")
-              icon.save(f"{folder}/ic_launcher_round.png")
-              fg = Image.new("RGBA", (px * 9 // 4, px * 9 // 4), (0, 0, 0, 0))
-              inner = int(fg.size[0] * 0.66)
-              fg.paste(src.resize((inner, inner), Image.LANCZOS), ((fg.size[0] - inner) // 2,) * 2)
-              fg.save(f"{folder}/ic_launcher_foreground.png")
-          os.makedirs(f"{res}/values", exist_ok=True)
-          open(f"{res}/values/ic_launcher_background.xml", "w").write(
-              '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
-              '    <color name="ic_launcher_background">#01164D</color>\n</resources>\n')
-          for p in glob.glob(f"{res}/drawable*/splash.png"):
-              W, H = Image.open(p).size
-              canvas = Image.new("RGBA", (W, H), BG)
-              side = int(min(W, H) * 0.45)
-              canvas.alpha_composite(src.resize((side, side), Image.LANCZOS), ((W - side) // 2, (H - side) // 2))
-              canvas.convert("RGB").save(p)
+          if os.environ.get("LOGO"):
+              src = Image.open(os.environ["LOGO"]).convert("RGBA")
+              w, h = src.size
+              s = min(w, h)
+              src = src.crop(((w - s) // 2, (h - s) // 2, (w - s) // 2 + s, (h - s) // 2 + s))
+              if src.getpixel((2, 2))[3] == 255:
+                  m = Image.new("L", (s * 2, s * 2), 0)
+                  ImageDraw.Draw(m).ellipse((10, 10, s * 2 - 10, s * 2 - 10), fill=255)
+                  src.putalpha(m.resize((s, s), Image.LANCZOS))
+              legacy = {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}
+              for d, px in legacy.items():
+                  folder = f"{res}/mipmap-{d}"
+                  os.makedirs(folder, exist_ok=True)
+                  icon = src.resize((px, px), Image.LANCZOS)
+                  icon.save(f"{folder}/ic_launcher.png")
+                  icon.save(f"{folder}/ic_launcher_round.png")
+                  fg = Image.new("RGBA", (px * 9 // 4, px * 9 // 4), (0, 0, 0, 0))
+                  inner = int(fg.size[0] * 0.66)
+                  fg.paste(src.resize((inner, inner), Image.LANCZOS), ((fg.size[0] - inner) // 2,) * 2)
+                  fg.save(f"{folder}/ic_launcher_foreground.png")
+              os.makedirs(f"{res}/values", exist_ok=True)
+              open(f"{res}/values/ic_launcher_background.xml", "w").write(
+                  '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
+                  '    <color name="ic_launcher_background">#01164D</color>\n</resources>\n')
+              for p in glob.glob(f"{res}/drawable*/splash.png"):
+                  W, H = Image.open(p).size
+                  canvas = Image.new("RGBA", (W, H), BG)
+                  side = int(min(W, H) * 0.45)
+                  canvas.alpha_composite(src.resize((side, side), Image.LANCZOS), ((W - side) // 2, (H - side) // 2))
+                  canvas.convert("RGB").save(p)
           import re
           sp = f"{res}/values/styles.xml"
           x = open(sp).read()
